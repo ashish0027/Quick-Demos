@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: app
+  template:
+    metadata:
+      labels:
+        app: app
+    spec:
+      containers:
+      - name: app
+        image: <region-key>.ocir.io/<image-url>
+        ports:
+        - name: app
+          containerPort: 5000
+          protocol: TCP
+      imagePullSecrets:
+        - name: <secret-key-name>
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-lb
+  labels:
+    app: app
+  annotations:
+    oci.oraclecloud.com/load-balancer-type: "lb"
+    service.beta.kubernetes.io/oci-load-balancer-shape: "flexible"
+    service.beta.kubernetes.io/oci-load-balancer-shape-flex-min: "10"
+    service.beta.kubernetes.io/oci-load-balancer-shape-flex-max: "100"
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 5000
+  selector:
+    app: app

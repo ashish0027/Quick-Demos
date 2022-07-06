@@ -1,0 +1,139 @@
+1. Make sure you have required policy at the root level. If not create a new policy with the following rule
+	  Allow service OKE to manage all-resources in tenancy
+	
+2. Then navigate to Developer Services on the OCI console and go to OKE clusters. Select 
+	  Create Cluster > Quick Create.  (Leave all the fields as default)
+	
+3. Once it is provisioned, you can either use Cloud Shell to access your cluster or you can use local Access to access the same.
+
+4. Accessing the cluster through local access
+
+	a. Create a separate VCN using VCN wizard 
+	b. Create a compute instance in the above created VCN
+	c. SSH into the newly created VCN using putty
+	d. Check if OCI CLI is installed or not. If not use the following command to install the same
+		- sudo dnf -y install oraclelinux-developer-release-el8
+		- sudo dnf install python36-oci-cli
+	e. check if OCI CLI is properly installed using the command. 
+		-  oci -v 
+	f. Navigate to the OKE Clusters page where you created the cluster and click on Cluster Access option. Click on Access Cluster button and follow the steps mentioned.  
+		*NOTE -You will prompted to enter your OCI User OCID as well as tenancy OCID the first time you access the cluster. Make sure you have all the required OCIDs. Finally you will be prompted to use an existing API key pair or generate a new one. Select the appropriate option and paste the API public key in the OCI console under your avatar > API signing Key > Paste public Key
+	g. Once the above steps are completed, check whether kubectl works fine using the following command
+		 - kubectl get nodes 
+	If all works fine you will see the details of your the nodes in your node pool
+		
+	
+
+Deploying an Application to OKE Cluster
+
+*We will be using Flask to create a simple python Hello world application which we will be deploying in the OKE cluster created*
+
+1. Create a directory to hold all the application files and binaries. Install Flask using the following  command
+ 
+                  pip3 install --user Flask
+
+2. Create a sample hello.py file and add the following lines of code
+		
+		from flask import Flask
+		app = Flask(__name__)
+		@app.route('/')
+		def hello_world():
+		    return '<h1>Hello World from Python Flask!</h1>'
+		if __name__ == "__main__":
+		    app.run(host="0.0.0.0", port=int("5000"),debug=True)
+		
+3. Set the environment variables 
+	   - export FLASK_APP=hello.py
+	   - export FLASK_ENV=development
+		
+4. Run and test the application using the following command in a new or duplicated terminal window using the following command
+	- curl -X GET http://localhost:5000
+
+5. Create a docker file in the current app directory using the following command  nano Dockerfile with the following content
+
+		FROM python:3.9-slim-buster
+		ADD hello.py /
+		COPY . /app
+		WORKDIR /app
+		RUN pip3 install Flask
+		EXPOSE 5000
+		CMD [ "python3", "./hello.py" ]
+		
+6.  Make sure docker is installed on your VM. If not use the following commands to install docker else skip to step 7
+	- sudo yum update
+	- sudo yum install docker
+	
+7. Now build the image from the created docker file using the following command.
+	- docker build -t python-hello-app .
+	
+8.  Check whether the image is created using docker images command - docker images
+9. Before deploying the application lets test the image using docker run command as shown below
+	- docker run --rm -p 5000:5000 python-hello-app:latest 
+10. We can verify that the container is running using the command  docker ps. Stop the container using docker stop <container-id>
+11. Now we will push the image created, to the OCI container repository. For that create a container repository using cloud console. 
+12. Next using CloudShell or CLI, login to container registry using docker login command as below
+	 - docker login iad.ocir.io          ( docker login <region-id>.ocir.io ) 
+	- Username - <tenancy-namespace>/<username>
+	- Password -  Auth Token temp password created under user settings  
+	
+13.  Before pushing the image to the registry tag the local image  with the URL for the registry plus the repo name using the following command 
+	-  docker tag <local-image-name> <registry-URL>/<repo-name> 
+	
+14. Check whether a new image with the tag specified has been created or not using  docker images command
+15. After successful verification push the image to the container registry using the following command
+	 - docker push <region-key>.ocir.io/<namespace>:<tag>
+16. Check on the OCI Container Registry console for newly pushed image. 
+17. To deploy the Image to the OKE cluster we have first create a   REGISTRY SECRET for your application.  This secret basically authenticates the image when we deploy it to the OKE cluster. Use the following command to create a secret
+	 - kubectl create secret docker-registry <secret-name-you-want-to-give> --docker-server=<region-key>.ocir.io --docker-username='<user-name>' --docker-password='<auth-token-password>' --docker-email='<your-registered-mail>'
+		
+18. To verify whether the secret has been created we can use the following command
+	- kubectl get secret <secret-name-you-gave> --output=yaml
+19. Finally you are left with a final task to create a kubernetes manifest file which is basically a YAML file. Use the command  nano app.yaml and include the following contents. We have also added a flexible load balancer in the manifest file.
+
+							apiVersion: apps/v1
+							kind: Deployment
+							metadata:
+							  name: app
+							spec:
+							  selector:
+							    matchLabels:
+							      app: app
+							  replicas: 3
+							  template:
+							    metadata:
+							      labels:
+							        app: app
+							    spec:
+							      containers:
+							      - name: app
+							        image: <region-key>.ocir.io/<full-image-URL>:<tag>                                                  
+							        imagePullPolicy: Always
+							        ports:
+							        - name: app
+							          containerPort: 5000
+							          protocol: TCP
+							      imagePullSecrets:
+							        - name: <secret-name>
+							---
+							apiVersion:  v1
+							kind: Service
+							metadata:
+							  name: app-lb
+							  labels:
+							    app: app
+							  annotations:
+							    oci.oraclecloud.com/load-balancer-type: "lb"
+							    service.beta.kubernetes.io/oci-load-balancer-shape: "flexible"
+							    service.beta.kubernetes.io/oci-load-balancer-shape-flex-min: "10"
+							    service.beta.kubernetes.io/oci-load-balancer-shape-flex-max: "100"
+							spec:
+							  type: LoadBalancer
+							  ports:
+							  - port: 5000
+	
+20. Now to deploy your application we can use the following command
+	 - kubectl create -f app.yaml 
+21. To see what services are running and their details use the following command. The command below gives the LB's external-IP we can connect to see the app running. Use that IP in a new tab along with the port number to see the result.
+	- kubectl get service
+22. To un-deploy/delete the application from the cluster use the following command
+	 kubectl delete -f app.yaml

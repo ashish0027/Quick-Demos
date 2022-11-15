@@ -21,7 +21,6 @@
 	g. Once the above steps are completed, check whether kubectl works fine using the following command
 		 - kubectl get nodes 
 	If all works fine you will see the details of your the nodes in your node pool
-		
 	
 
 Deploying an Application to OKE Cluster
@@ -62,6 +61,7 @@ Deploying an Application to OKE Cluster
 12. Next using CloudShell or CLI, login to container registry using docker login command as below
 	 - docker login iad.ocir.io          ( docker login <region-id>.ocir.io ) 
 	- Username - <tenancy-namespace>/<username>
+		****NOTE  - Username = <tenancy-namespace>/<your-user-name>
 	- Password -  Auth Token temp password created under user settings  
 	
 13.  Before pushing the image to the registry tag the local image  with the URL for the registry plus the repo name using the following command 
@@ -73,12 +73,18 @@ Deploying an Application to OKE Cluster
 16. Check on the OCI Container Registry console for newly pushed image. 
 17. To deploy the Image to the OKE cluster we have first create a   REGISTRY SECRET for your application.  This secret basically authenticates the image when we deploy it to the OKE cluster. Use the following command to create a secret
 	 - kubectl create secret docker-registry <secret-name-you-want-to-give> --docker-server=<region-key>.ocir.io --docker-username='<user-name>' --docker-password='<auth-token-password>' --docker-email='<your-registered-mail>'
-		
+	
+	****NOTE  - Username = <tenancy-namespace>/<your-user-name>
+	
 18. To verify whether the secret has been created we can use the following command
 	- kubectl get secret <secret-name-you-gave> --output=yaml
 19. Finally you are left with a final task to create a kubernetes manifest file which is basically a YAML file. Use the command  nano app.yaml and include the following contents. We have also added a flexible load balancer in the manifest file.
 
 	"YOU  CAN USE THE YAML FILE stored in this BRANCH"
+	
+	
+	****NOTE - Replace the secret variable with the name of the secret you just created 
+		   Replace the image with its full URL (Format - <region-id>.ocir.io/<tenancy-namespace>/<repo-name>:tag)
 	
 20. Now to deploy your application we can use the following command
 	 - kubectl create -f app.yaml 

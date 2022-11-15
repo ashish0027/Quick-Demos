@@ -91,3 +91,4 @@ Deploying an Application to OKE Cluster
 	- kubectl get service
 22. To un-deploy/delete the application from the cluster use the following command
 	 kubectl delete -f app.yaml
+	 

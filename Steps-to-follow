@@ -61,7 +61,6 @@ Deploying an Application to OKE Cluster
 12. Next using CloudShell or CLI, login to container registry using docker login command as below
 	 - docker login iad.ocir.io          ( docker login <region-id>.ocir.io ) 
 	- Username - <tenancy-namespace>/<username>
-		****NOTE  - Username = <tenancy-namespace>/<your-user-name>
 	- Password -  Auth Token temp password created under user settings  
 	
 13.  Before pushing the image to the registry tag the local image  with the URL for the registry plus the repo name using the following command 
